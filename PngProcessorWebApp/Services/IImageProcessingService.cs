@@ -1,13 +1,13 @@
-﻿using Hangfire;
+﻿using System.Threading;
 
 namespace PngProcessorWebApp.Services
 {
     public interface IImageProcessingService
     {
-        void RunProcessing(string fileId, string filePath, IJobCancellationToken cancellationToken);
-        void RegisterNewJob(string fileId, string jobId);
+        void RunProcessing(string fileId, string filePath);
+        void RegisterNewThread(string fileId, Thread thread);
         double? GetStatus(string fileId);
-        string GetJobId(string fileId);
-        void RemoveJobId(string fileId);
+        Thread GetThread(string fileId);
+        void RemoveThread(string fileId);
     }
 }

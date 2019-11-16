@@ -1,16 +1,17 @@
 ﻿using System.Collections.Generic;
+using System.Threading;
 
 namespace PngProcessorWebApp.Infrastructure
 {
     public static class ImageProcessingStorage
     {
         // I can do it through db as well, but since there is no requirement about data persistence between launches, I'll make it at easiest way.
-        private static Dictionary<string, string> _fileJobIdPair = new Dictionary<string, string>();
+        private static Dictionary<string, Thread> _fileThreadPair = new Dictionary<string, Thread>();
         private static Dictionary<string, double> _fileStatusPair = new Dictionary<string, double>();
 
-        public static void AddFileJobPair(string fileName, string jobId)
+        public static void AddFileJobPair(string fileName, Thread thread)
         {
-            _fileJobIdPair.Add(fileName, jobId);
+            _fileThreadPair.Add(fileName, thread);
         }
 
         public static void UpdateFileStatus(string fileId, double newStatus)
@@ -26,13 +27,13 @@ namespace PngProcessorWebApp.Infrastructure
             }
         }
 
-        public static void RemoveFileJobPairByFileName(string fileId)
+        public static void RemoveFileThreadPairByFileName(string fileId)
         {
-            var found = _fileJobIdPair.TryGetValue(fileId, out var jobId);
+            var found = _fileThreadPair.TryGetValue(fileId, out var thread);
 
             if (found)
             {
-                _fileJobIdPair.Remove(fileId);
+                _fileThreadPair.Remove(fileId);
             }
         }
 
@@ -47,12 +48,12 @@ namespace PngProcessorWebApp.Infrastructure
             return null;
         }
 
-        public static string GetJobIdByFile(string fileId)
+        public static Thread GetThreadByFile(string fileId)
         {
-            var found = _fileJobIdPair.TryGetValue(fileId, out var jobId);
+            var found = _fileThreadPair.TryGetValue(fileId, out var thread);
             if (found)
             {
-                return jobId;
+                return thread;
             }
 
             return null;

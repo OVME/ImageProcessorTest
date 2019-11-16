@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using Autofac.Integration.WebApi;
-using Hangfire;
 using Microsoft.Owin;
 using Owin;
 using PngProcessorWebApp.Services;
@@ -17,9 +16,6 @@ namespace PngProcessorWebApp
         {
             var config = new HttpConfiguration();
             config.MapHttpAttributeRoutes();
-            Hangfire.GlobalConfiguration.Configuration.UseSqlServerStorage("default");
-            app.UseHangfireDashboard();
-            app.UseHangfireServer();
             app.UseWebApi(config);
             var builder = new ContainerBuilder();
             builder.RegisterApiControllers(Assembly.GetExecutingAssembly());

@@ -1,6 +1,6 @@
-﻿using Hangfire;
-using PngProcessorWebApp.Services;
+﻿using PngProcessorWebApp.Services;
 using System;
+using System.Threading;
 using System.Web;
 using System.Web.Http;
 
@@ -28,11 +28,9 @@ namespace PngProcessorWebApp.Controllers
                 var filePath = HttpContext.Current.Server.MapPath("~/" + fileId);
                 file.SaveAs(filePath);
 
-                // So this is how it should work ideally. But it appears that PngProcessor.Prosess does not get a CancellationToken as parameter.
-                // Do you know what that means? That means that hangfire and any other things letting you easilly manage any jobs are just useless.
-                // And also that means I'm going to use just bare threads and Thread.Abort method.
-                var jobId = BackgroundJob.Enqueue(() => _imageProcessingService.RunProcessing(fileId, filePath, JobCancellationToken.Null));
-                _imageProcessingService.RegisterNewJob(fileId, jobId);
+                var workerThread = new Thread(() => _imageProcessingService.RunProcessing(fileId, filePath));
+                workerThread.Start();
+                _imageProcessingService.RegisterNewThread(fileId, workerThread);
                 return Ok(fileId);
             }
             else
@@ -58,16 +56,16 @@ namespace PngProcessorWebApp.Controllers
         [HttpDelete]
         public IHttpActionResult Delete(string fileId)
         {
-            var jobId = _imageProcessingService.GetJobId(fileId);
+            var thread = _imageProcessingService.GetThread(fileId);
 
-            if (jobId == null)
+            if (thread == null)
             {
                 return NotFound();
             }
 
-            BackgroundJob.Delete(jobId);
-            _imageProcessingService.RemoveJobId(fileId);
-
+            thread.Abort();
+            _imageProcessingService.RemoveThread(fileId);
+            // I know that I also must remove status here. And return 404 for /status request. I don't do this in order to show that processing is actually stopped.
             return Ok();
         }
     }
