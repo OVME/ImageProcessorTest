@@ -1,6 +1,5 @@
 ﻿using Hangfire;
-using ImageProcessor;
-using PngProcessorWebApp.Infrastructure;
+using PngProcessorWebApp.Services;
 using System;
 using System.Web;
 using System.Web.Http;
@@ -10,6 +9,13 @@ namespace PngProcessorWebApp.Controllers
     [RoutePrefix("api/images")]
     public class ImageController : ApiController
     {
+        private readonly IImageProcessingService _imageProcessingService;
+
+        public ImageController(IImageProcessingService imageProcessingService)
+        {
+            _imageProcessingService = imageProcessingService;
+        }
+
         [Route("")]
         [HttpPost]
         public IHttpActionResult UploadImage()
@@ -22,8 +28,11 @@ namespace PngProcessorWebApp.Controllers
                 var filePath = HttpContext.Current.Server.MapPath("~/" + fileId);
                 file.SaveAs(filePath);
 
-                var jobId = BackgroundJob.Enqueue(() => RunJob(fileId, filePath));
-                ImageProcessingStorage.AddFileJobPair(fileId, jobId);
+                // So this is how it should work ideally. But it appears that PngProcessor.Prosess does not get a CancellationToken as parameter.
+                // Do you know what that means? That means that hangfire and any other things letting you easilly manage any jobs are just useless.
+                // And also that means I'm going to use just bare threads and Thread.Abort method.
+                var jobId = BackgroundJob.Enqueue(() => _imageProcessingService.RunProcessing(fileId, filePath, JobCancellationToken.Null));
+                _imageProcessingService.RegisterNewJob(fileId, jobId);
                 return Ok(fileId);
             }
             else
@@ -36,7 +45,7 @@ namespace PngProcessorWebApp.Controllers
         [HttpGet]
         public IHttpActionResult GetImageProcessingStatus(string fileId)
         {
-            var status = ImageProcessingStorage.GetStatus(fileId);
+            var status = _imageProcessingService.GetStatus(fileId);
             if (status == null)
             {
                 return NotFound();
@@ -49,7 +58,7 @@ namespace PngProcessorWebApp.Controllers
         [HttpDelete]
         public IHttpActionResult Delete(string fileId)
         {
-            var jobId = ImageProcessingStorage.GetJobIdByFile(fileId);
+            var jobId = _imageProcessingService.GetJobId(fileId);
 
             if (jobId == null)
             {
@@ -57,25 +66,9 @@ namespace PngProcessorWebApp.Controllers
             }
 
             BackgroundJob.Delete(jobId);
-            ImageProcessingStorage.RemoveFileJobPairByFileName(fileId);
+            _imageProcessingService.RemoveJobId(fileId);
 
             return Ok();
-        }
-
-        public void RunJob(string fileId, string filePath)
-        {
-            using (var processor = new PngProcessor())
-            {
-                processor.ProgressChanged += (status) =>
-                {
-                    ImageProcessingStorage.UpdateFileStatus(fileId, status);
-                };
-                ImageProcessingStorage.UpdateFileStatus(fileId, 0);
-                processor.Process(filePath);
-
-                // Sadly, but I can't schedule it as a continuation of current job.
-                BackgroundJob.Schedule(() => ImageProcessingStorage.RemoveFileJobPairByFileName(fileId), DateTime.Now.AddMinutes(10));
-            }
         }
     }
 }

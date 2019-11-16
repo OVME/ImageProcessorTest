@@ -1,6 +1,10 @@
-﻿using Hangfire;
+﻿using Autofac;
+using Autofac.Integration.WebApi;
+using Hangfire;
 using Microsoft.Owin;
 using Owin;
+using PngProcessorWebApp.Services;
+using System.Reflection;
 using System.Web.Http;
 
 [assembly: OwinStartup(typeof(PngProcessorWebApp.Startup))]
@@ -17,6 +21,11 @@ namespace PngProcessorWebApp
             app.UseHangfireDashboard();
             app.UseHangfireServer();
             app.UseWebApi(config);
+            var builder = new ContainerBuilder();
+            builder.RegisterApiControllers(Assembly.GetExecutingAssembly());
+            builder.RegisterType<ImageProcessingService>().As<IImageProcessingService>();
+            var container = builder.Build();
+            config.DependencyResolver = new AutofacWebApiDependencyResolver(container);
         }
     }
 }
